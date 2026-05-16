@@ -136,7 +136,7 @@ async def main():
     print(f"  Found {len(kv_listings)} listings from kv.ee.")
 
     print("\n[2/4] Scraping city24 listings...")
-    city24_listings = city24_scraper.scrape_all_pages()
+    city24_listings = await city24_scraper.scrape_all_pages()
     print(f"  Found {len(city24_listings)} listings from city24.")
 
     all_listings = kv_listings + city24_listings

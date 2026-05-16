@@ -1,7 +1,8 @@
-import httpx
-import config
+import asyncio
 import re
-import time
+import json
+from playwright.async_api import async_playwright
+import config
 
 
 def _slugify(s):
@@ -11,43 +12,32 @@ def _slugify(s):
     return s
 
 
-def scrape_all_pages():
-    url = config.CITY24_SEARCH_URL
+async def scrape_all_pages():
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent=config.PLAYWRIGHT_USER_AGENT,
+            viewport={"width": 1920, "height": 1080},
+        )
+        page = await context.new_page()
 
-    headers = {
-        "User-Agent": config.USER_AGENT,
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-GB,en;q=0.9,et;q=0.8",
-        "Referer": "https://www.city24.ee/en/real-estate/apartments-for-rent/",
-        "Origin": "https://www.city24.ee",
-        "Connection": "keep-alive",
-    }
+        # Load city24 page first to get cookies/session
+        await page.goto(
+            "https://www.city24.ee/en/real-estate/apartments-for-rent/",
+            wait_until="networkidle",
+            timeout=60000,
+        )
+        await asyncio.sleep(2)
 
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            resp = httpx.get(
-                url,
-                headers=headers,
-                timeout=30,
-                follow_redirects=True,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            break
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 403 and attempt < max_retries - 1:
-                wait = 5 * (attempt + 1)
-                print(f"  [city24] 403 Forbidden, retrying in {wait}s... (attempt {attempt+1}/{max_retries})")
-                time.sleep(wait)
-                continue
-            print(f"  [city24] HTTP {e.response.status_code}: {e.response.text[:200]}")
-            return []
-        except Exception as e:
-            print(f"  [city24] Request failed: {e}")
-            return []
-    else:
-        return []
+        # Fetch API data from within browser context
+        data = await page.evaluate("""
+            async () => {
+                const resp = await fetch("CITY24_URL");
+                return await resp.json();
+            }
+        """.replace("CITY24_URL", config.CITY24_SEARCH_URL))
+
+        await browser.close()
 
     if not data:
         return []
@@ -123,9 +113,9 @@ def _parse_listings(data):
     return listings
 
 
-def main():
+async def main():
     print("Starting city24 scraper...")
-    listings = scrape_all_pages()
+    listings = await scrape_all_pages()
     print(f"Done. Found {len(listings)} listings.")
     for l in listings[:5]:
         print(f"  #{l['id']} - {l['title']} | {l['price']} | {l['area']}")
@@ -134,4 +124,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
