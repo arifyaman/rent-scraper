@@ -12,6 +12,40 @@ def _slugify(s):
     return s
 
 
+def _extract_slogan(item):
+    slogans = item.get("slogans", {})
+    if not isinstance(slogans, dict):
+        return ""
+    en_block = slogans.get("en_GB", {})
+    if isinstance(en_block, dict):
+        slogan = en_block.get("slogan", "")
+        if slogan:
+            return slogan
+    et_block = slogans.get("et_EE", {})
+    if isinstance(et_block, dict):
+        return et_block.get("slogan", "")
+    return ""
+
+
+def _parse_date(date_str):
+    if not date_str:
+        return ""
+    return date_str.split("T")[0]
+
+
+def _process_image(item):
+    main_image = item.get("main_image", {})
+    image = main_image.get("url", "") if isinstance(main_image, dict) else ""
+    if image and "{fmt:em}" in image:
+        image = image.replace("{fmt:em}", "13")
+    return image
+
+
+def _build_url(item, slug):
+    friendly_id = item.get("friendly_id", str(item.get("id", "")))
+    return f"https://www.city24.ee/en/real-estate/apartments-for-rent/{slug}/{friendly_id}"
+
+
 async def scrape_all_pages():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -64,38 +98,14 @@ def _parse_listings(data):
         property_size = item.get("property_size", "")
         area = f"{property_size} m²" if property_size else ""
 
-        main_image = item.get("main_image", {})
-        image = main_image.get("url", "") if isinstance(main_image, dict) else ""
-        if image and "{fmt:em}" in image:
-            image = image.replace("{fmt:em}", "13")
-
-        date_published = item.get("date_published", "")
-        if date_published:
-            date_activated = date_published.split("T")[0]
-        else:
-            date_activated = ""
-
-        slogan = ""
-        slogans = item.get("slogans", {})
-        if isinstance(slogans, dict):
-            en_block = slogans.get("en_GB", {})
-            if isinstance(en_block, dict):
-                slogan = en_block.get("slogan", "")
-            if not slogan:
-                et_block = slogans.get("et_EE", {})
-                if isinstance(et_block, dict):
-                    slogan = et_block.get("slogan", "")
-
+        image = _process_image(item)
+        date_activated = _parse_date(item.get("date_published", ""))
+        slogan = _extract_slogan(item)
         title = slogan or f"Apartment {rooms}r"
 
         addr = item.get("address", {})
-        parish = addr.get("parish_name", "")
-        city = addr.get("city_name", "")
-        street = addr.get("street_name", "")
-        friendly_id = item.get("friendly_id", item_id)
-
-        slug = _slugify(f"{parish} {city} {street}")
-        url = f"https://www.city24.ee/en/real-estate/apartments-for-rent/{slug}/{friendly_id}"
+        slug = _slugify(f"{addr.get('parish_name', '')} {addr.get('city_name', '')} {addr.get('street_name', '')}")
+        url = _build_url(item, slug)
 
         listings.append({
             "id": item_id,
