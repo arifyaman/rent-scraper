@@ -15,8 +15,8 @@ import config
 
 def load_email_config():
     app_env = os.getenv("APP_ENV", "production")
-    load_dotenv(f".env.{app_env}")
     load_dotenv()
+    load_dotenv(f".env.{app_env}", override=True)
     return {
         "disabled": os.getenv("EMAIL_DISABLED", "").lower() in ("true", "1", "yes"),
         "server": os.getenv("SMTP_SERVER", ""),
@@ -66,7 +66,7 @@ def _source_badge(l):
 def _listing_card(l):
     image_html = ""
     if l.get("image"):
-        image_html = f'<img src="{l["image"]}" width="200" height="150" style="object-fit: cover; border-radius: 4px;"><br>'
+        image_html = f'<img src="{l["image"]}" width="300" height="200" style="object-fit: cover; border-radius: 4px;"><br>'
 
     date_str = l.get("date_activated", "")
     date_line = f"Published: {date_str}<br>" if date_str else ""
@@ -106,7 +106,7 @@ def build_report(new, removed, changed):
         for c in changed:
             image_html = ""
             if c.get("image"):
-                image_html = f'<img src="{c["image"]}" width="200" height="150" style="object-fit: cover; border-radius: 4px;"><br>'
+                image_html = f'<img src="{c["image"]}" width="300" height="200" style="object-fit: cover; border-radius: 4px;"><br>'
             badge = _source_badge(c)
             parts.append(f"""<div style="border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin: 8px 0; display: inline-block; width: 280px; vertical-align: top;">
     {image_html}
@@ -147,6 +147,9 @@ async def main():
     print(f"  New: {len(new)}, Removed: {len(removed)}, Price changes: {len(changed)}")
 
     has_changes = new or removed or changed
+
+    if removed:
+        database.delete_listings([l["id"] for l in removed])
 
     database.upsert_listings(all_listings)
 

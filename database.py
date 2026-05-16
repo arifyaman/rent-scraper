@@ -91,13 +91,24 @@ def get_changes(current_listings):
     for lid in sorted(changed_ids):
         price_changes.append({
             "id": lid,
+            "source": current_map[lid].get("source", ""),
             "title": current_map[lid]["title"],
             "old_price": db_map[lid]["price"],
             "new_price": current_map[lid]["price"],
             "url": current_map[lid]["url"],
+            "image": current_map[lid].get("image", ""),
         })
 
     return new_listings, removed_listings, price_changes
+
+
+def delete_listings(listing_ids):
+    if not listing_ids:
+        return
+    conn = get_connection()
+    conn.executemany("DELETE FROM listings WHERE id = ?", [(lid,) for lid in listing_ids])
+    conn.commit()
+    conn.close()
 
 
 def _normalize_price(price_str):

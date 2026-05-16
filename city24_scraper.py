@@ -1,9 +1,16 @@
 import httpx
 import config
+import re
+
+
+def _slugify(s):
+    s = s.lower().strip()
+    s = re.sub(r'[^\w\s-]', '', s)
+    s = re.sub(r'[\s]+', '-', s)
+    return s
 
 
 def scrape_all_pages():
-    all_listings = []
     url = config.CITY24_SEARCH_URL
 
     try:
@@ -17,13 +24,14 @@ def scrape_all_pages():
         data = resp.json()
     except Exception as e:
         print(f"  [city24] Request failed: {e}")
-        return all_listings
+        return []
+
+    if not data:
+        return []
 
     listings = _parse_listings(data)
-    all_listings.extend(listings)
-    print(f"  [city24] Scraped {len(all_listings)} listings so far...")
-
-    return all_listings
+    print(f"  [city24] Scraped {len(listings)} listings.")
+    return listings
 
 
 def _parse_listings(data):
@@ -46,7 +54,7 @@ def _parse_listings(data):
         main_image = item.get("main_image", {})
         image = main_image.get("url", "") if isinstance(main_image, dict) else ""
         if image and "{fmt:em}" in image:
-            image = image.replace("{fmt:em}", "w:640")
+            image = image.replace("{fmt:em}", "13")
 
         date_published = item.get("date_published", "")
         if date_published:
@@ -67,7 +75,14 @@ def _parse_listings(data):
 
         title = slogan or f"Apartment {rooms}r"
 
-        url = f"https://www.city24.ee/en_GB/realty/{item_id}/"
+        addr = item.get("address", {})
+        parish = addr.get("parish_name", "")
+        city = addr.get("city_name", "")
+        street = addr.get("street_name", "")
+        friendly_id = item.get("friendly_id", item_id)
+
+        slug = _slugify(f"{parish} {city} {street}")
+        url = f"https://www.city24.ee/en/real-estate/apartments-for-rent/{slug}/{friendly_id}"
 
         listings.append({
             "id": item_id,
