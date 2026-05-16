@@ -1,6 +1,6 @@
-# KV.ee Rental Scraper
+# Rental Scraper (KV.ee + City24)
 
-Monitors rental listings on [KV.ee](https://www.kv.ee) and sends email notifications for new, removed, or price-changed listings.
+Monitors rental listings on [KV.ee](https://www.kv.ee) and [City24](https://www.city24.ee), merges results, and sends email notifications for new, removed, or price-changed listings.
 
 ## Setup
 
@@ -47,8 +47,9 @@ Runs hourly checks with file logging to `logs/service.log`. Handles SIGINT/SIGTE
 | File | Description |
 |------|-------------|
 | `scraper.py` | Playwright-based scraper using KV.ee's JSON API |
+| `city24_scraper.py` | HTTP-based scraper for City24's search API |
 | `database.py` | SQLite storage and change detection |
-| `monitor.py` | Orchestration and HTML email reporting |
+| `monitor.py` | Orchestration, merging sources, and HTML email reporting |
 | `service.py` | Daemon loop with hourly execution and logging |
 | `config.py` | Search params, paths, and service settings |
 
