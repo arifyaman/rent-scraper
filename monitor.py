@@ -13,8 +13,11 @@ import config
 
 
 def load_email_config():
+    app_env = os.getenv("APP_ENV", "production")
+    load_dotenv(f".env.{app_env}")
     load_dotenv()
     return {
+        "disabled": os.getenv("EMAIL_DISABLED", "").lower() in ("true", "1", "yes"),
         "server": os.getenv("SMTP_SERVER", ""),
         "port": int(os.getenv("SMTP_PORT", "25")),
         "from": os.getenv("EMAIL_FROM", ""),
@@ -24,6 +27,10 @@ def load_email_config():
 
 
 def send_email(cfg, subject, body):
+    if cfg.get("disabled"):
+        print("[!] Email disabled (development mode) -- skipping send")
+        print(f"    Subject: {subject}")
+        return
     if not cfg["server"]:
         print("[!] Email config incomplete -- skipping send. Set values in .env")
         print(f"    Subject: {subject}")
