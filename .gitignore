@@ -6,3 +6,4 @@ venv/
 *.tar.gz
 kv-monitor.service
 install-service.sh
+.env.development
