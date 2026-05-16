@@ -17,12 +17,14 @@ playwright install-deps chromium
 Set your SMTP credentials in `.env`:
 
 ```
-SMTP_HOST=smtp.gmail.com
+SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASSWORD=your_app_password
+EMAIL_FROM=your_email@gmail.com
+EMAIL_FROM_NAME=Your Name
 EMAIL_TO=recipient@example.com
 ```
+
+For development, create `.env.development` with `EMAIL_DISABLED=true` to skip sending emails.
 
 Edit `config.py` to adjust search filters, check interval, and DB path.
 

@@ -18,7 +18,7 @@ async def scrape_all_pages():
         await page.goto(search_url, wait_until="networkidle", timeout=60000)
         await asyncio.sleep(2)
 
-        accept_btn = await page.query_selector('#onetrust-pc-btn')
+        accept_btn = await page.query_selector('#onetrust-accept-btn-handler')
         if accept_btn:
             await accept_btn.click(force=True)
             await asyncio.sleep(1)
@@ -123,7 +123,7 @@ def _build_api_url(params, offset=0):
     params = params.copy()
     params["offset"] = offset
     query = urllib.parse.urlencode(params)
-    return f"{config.KV_API_BASE_URL}/map&{query}"
+    return f"{config.KV_API_BASE_URL}/map?{query}"
 
 
 def _build_search_url(params):
