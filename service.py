@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the kv.ee monitor as a background service with hourly checks."""
+"""Run the rental monitor as a background service with hourly checks."""
 import asyncio
 import logging
 import signal

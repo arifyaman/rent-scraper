@@ -1,6 +1,7 @@
 import httpx
 import config
 import re
+import time
 
 
 def _slugify(s):
@@ -13,17 +14,39 @@ def _slugify(s):
 def scrape_all_pages():
     url = config.CITY24_SEARCH_URL
 
-    try:
-        resp = httpx.get(
-            url,
-            headers={"User-Agent": config.USER_AGENT},
-            timeout=30,
-            follow_redirects=True,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        print(f"  [city24] Request failed: {e}")
+    headers = {
+        "User-Agent": config.USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-GB,en;q=0.9,et;q=0.8",
+        "Referer": "https://www.city24.ee/en/real-estate/apartments-for-rent/",
+        "Origin": "https://www.city24.ee",
+        "Connection": "keep-alive",
+    }
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            resp = httpx.get(
+                url,
+                headers=headers,
+                timeout=30,
+                follow_redirects=True,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            break
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403 and attempt < max_retries - 1:
+                wait = 5 * (attempt + 1)
+                print(f"  [city24] 403 Forbidden, retrying in {wait}s... (attempt {attempt+1}/{max_retries})")
+                time.sleep(wait)
+                continue
+            print(f"  [city24] HTTP {e.response.status_code}: {e.response.text[:200]}")
+            return []
+        except Exception as e:
+            print(f"  [city24] Request failed: {e}")
+            return []
+    else:
         return []
 
     if not data:
