@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
 import scraper
+import city24_scraper
 import database
 import config
 
@@ -53,21 +54,30 @@ def send_email(cfg, subject, body):
         print(f"  Failed to send email: {e}")
 
 
+def _source_badge(l):
+    src = l.get("source", "")
+    if src == "city24":
+        return '<span style="background: #4a90d9; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">city24</span>'
+    elif src == "kv.ee":
+        return '<span style="background: #f0ad4e; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 3px; margin-left: 4px;">kv.ee</span>'
+    return ""
+
+
 def _listing_card(l):
-    """Build HTML card for a listing with image, price, and date."""
     image_html = ""
     if l.get("image"):
         image_html = f'<img src="{l["image"]}" width="200" height="150" style="object-fit: cover; border-radius: 4px;"><br>'
-    
+
     date_str = l.get("date_activated", "")
     date_line = f"Published: {date_str}<br>" if date_str else ""
-    
+
     price_str = l.get("price", "")
     area_str = l.get("area", "")
-    
+    badge = _source_badge(l)
+
     return f"""<div style="border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin: 8px 0; display: inline-block; width: 280px; vertical-align: top;">
     {image_html}
-    <strong>#{l['id']}</strong> - {l['title']}<br>
+    <strong>#{l['id']}</strong> {badge} - {l['title']}<br>
     <span style="font-size: 18px; color: #c00;">{price_str}</span> &nbsp;|&nbsp; {area_str}<br>
     {date_line}
     <a href="{l['url']}" style="color: #0066cc;">View listing</a>
@@ -78,7 +88,7 @@ def build_report(new, removed, changed):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     parts = [f"""<html>
 <body style="font-family: Arial, sans-serif; font-size: 14px;">
-<h2>kv.ee Rental Monitor -- {now}</h2>
+<h2>Rental Monitor -- {now}</h2>
 <hr>"""]
 
     if new:
@@ -97,9 +107,10 @@ def build_report(new, removed, changed):
             image_html = ""
             if c.get("image"):
                 image_html = f'<img src="{c["image"]}" width="200" height="150" style="object-fit: cover; border-radius: 4px;"><br>'
+            badge = _source_badge(c)
             parts.append(f"""<div style="border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin: 8px 0; display: inline-block; width: 280px; vertical-align: top;">
     {image_html}
-    <strong>#{c['id']}</strong> - {c['title']}<br>
+    <strong>#{c['id']}</strong> {badge} - {c['title']}<br>
     <span style="color: #999;">{c['old_price']}</span> &rarr; <span style="font-size: 18px; color: #c00;">{c['new_price']}</span><br>
     <a href="{c['url']}" style="color: #0066cc;">View listing</a>
 </div>""")
@@ -107,7 +118,7 @@ def build_report(new, removed, changed):
     if not new and not removed and not changed:
         parts.append("<p>No changes detected.</p>")
 
-    parts.append("<hr><p><em>This is an automated alert from kv.ee rental monitor.</em></p></body></html>")
+    parts.append("<hr><p><em>This is an automated alert from rental monitor.</em></p></body></html>")
     return "\n".join(parts)
 
 
@@ -115,23 +126,29 @@ async def main():
     email_cfg = load_email_config()
 
     print("=" * 60)
-    print("kv.ee Rental Monitor")
+    print("Rental Monitor (kv.ee + city24)")
     print("=" * 60)
 
     database.init_db()
 
-    print("\n[1/3] Scraping listings...")
-    current_listings = await scraper.scrape_all_pages()
-    print(f"  Found {len(current_listings)} listings.")
+    print("\n[1/4] Scraping kv.ee listings...")
+    kv_listings = await scraper.scrape_all_pages()
+    print(f"  Found {len(kv_listings)} listings from kv.ee.")
 
-    print("\n[2/3] Checking for changes...")
-    new, removed, changed = database.get_changes(current_listings)
+    print("\n[2/4] Scraping city24 listings...")
+    city24_listings = city24_scraper.scrape_all_pages()
+    print(f"  Found {len(city24_listings)} listings from city24.")
+
+    all_listings = kv_listings + city24_listings
+    print(f"\n[3/4] Total merged: {len(all_listings)} listings.")
+
+    print("\n[4/4] Checking for changes...")
+    new, removed, changed = database.get_changes(all_listings)
     print(f"  New: {len(new)}, Removed: {len(removed)}, Price changes: {len(changed)}")
 
     has_changes = new or removed or changed
 
-    print("\n[3/3] Updating database...")
-    database.upsert_listings(current_listings)
+    database.upsert_listings(all_listings)
 
     if has_changes:
         report = build_report(new, removed, changed)

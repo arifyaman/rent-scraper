@@ -16,6 +16,7 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS listings (
             id TEXT PRIMARY KEY,
+            source TEXT,
             url TEXT,
             title TEXT,
             price TEXT,
@@ -27,7 +28,13 @@ def init_db():
             scraped_at TEXT
         )
     """)
-    conn.commit()
+    # Add source column if it doesn't exist (migration)
+    try:
+        conn.execute("ALTER TABLE listings ADD COLUMN source TEXT")
+        conn.execute("UPDATE listings SET source = 'kv.ee' WHERE source IS NULL")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     conn.close()
 
 
@@ -37,16 +44,17 @@ def upsert_listings(listings):
     for listing in listings:
         conn.execute("""
             INSERT OR REPLACE INTO listings
-                (id, url, title, price, price_eur, rooms, area, image, date_activated, scraped_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, source, url, title, price, price_eur, rooms, area, image, date_activated, scraped_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             listing["id"],
+            listing.get("source", ""),
             listing["url"],
             listing["title"],
             listing["price"],
             listing.get("price_eur", 0),
-            listing["rooms"],
-            listing["area"],
+            listing.get("rooms", ""),
+            listing.get("area", ""),
             listing.get("image", ""),
             listing.get("date_activated", ""),
             now,
@@ -70,8 +78,8 @@ def get_changes(current_listings):
     changed_ids = set()
 
     for lid in current_ids & db_ids:
-        old_price = _normalize_price(db_map[lid]["price"])
-        new_price = _normalize_price(current_map[lid]["price"])
+        old_price = _normalize_price(db_map[lid].get("price", ""))
+        new_price = _normalize_price(current_map[lid].get("price", ""))
         if old_price and new_price and old_price != new_price:
             changed_ids.add(lid)
 
@@ -96,5 +104,5 @@ def _normalize_price(price_str):
     if not price_str:
         return ""
     import re
-    match = re.search(r"(\d[\d,]*)\s*€", price_str.replace("\u00a0", " "))
+    match = re.search(r"(\d[\d,.]*)", str(price_str).replace("\u00a0", " "))
     return match.group(1).replace(",", "") if match else ""

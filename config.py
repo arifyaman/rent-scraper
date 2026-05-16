@@ -3,10 +3,16 @@ PLAYWRIGHT_USER_AGENT = (
     "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
 )
 
-BASE_URL = "https://www.kv.ee/et/search"
-API_BASE_URL = "https://www.kv.ee/en/api/search"
+USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+)
 
-SEARCH_PARAMS = {
+# KV.ee settings
+KV_BASE_URL = "https://www.kv.ee/et/search"
+KV_API_BASE_URL = "https://www.kv.ee/en/api/search"
+
+KV_SEARCH_PARAMS = {
     "deal_type": "2",
     "rooms_min": "2",
     "rooms_max": "3",
@@ -22,9 +28,23 @@ SEARCH_PARAMS = {
     "orderby": "cdwl",
 }
 
+# City24 settings
+CITY24_API_BASE = "https://api.city24.ee/en_GB"
+
+CITY24_SEARCH_URL = (
+    "https://api.city24.ee/en_GB/search/realties"
+    "?address[cc]=1"
+    "&address[parish][]=181"
+    "&tsType=rent"
+    "&unitType=Apartment"
+    "&roomCount=2%2C3"
+    "&boundingBox[nw]=59.431207,24.751760"
+    "&boundingBox[se]=59.428029,24.765685"
+)
+
 DB_PATH = "data/listings.db"
 
-EMAIL_SUBJECT_PREFIX = "[kv.ee]"
+EMAIL_SUBJECT_PREFIX = "[rentals]"
 
 # Service settings
 CHECK_INTERVAL_SECONDS = 3600  # 1 hour
