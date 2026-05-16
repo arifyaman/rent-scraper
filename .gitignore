@@ -1,0 +1,8 @@
+data/
+logs/
+__pycache__/
+venv/
+.env
+*.tar.gz
+kv-monitor.service
+install-service.sh
