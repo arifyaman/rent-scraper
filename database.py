@@ -41,26 +41,32 @@ def init_db():
 def upsert_listings(listings):
     now = datetime.now().isoformat()
     conn = get_connection()
-    for listing in listings:
-        conn.execute("""
-            INSERT OR REPLACE INTO listings
-                (id, source, url, title, price, price_eur, rooms, area, image, date_activated, scraped_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            listing["id"],
-            listing.get("source", ""),
-            listing["url"],
-            listing["title"],
-            listing["price"],
-            listing.get("price_eur", 0),
-            listing.get("rooms", ""),
-            listing.get("area", ""),
-            listing.get("image", ""),
-            listing.get("date_activated", ""),
-            now,
-        ))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("BEGIN")
+        for listing in listings:
+            conn.execute("""
+                INSERT OR REPLACE INTO listings
+                    (id, source, url, title, price, price_eur, rooms, area, image, date_activated, scraped_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                listing["id"],
+                listing.get("source", ""),
+                listing["url"],
+                listing["title"],
+                listing["price"],
+                listing.get("price_eur", 0),
+                listing.get("rooms", ""),
+                listing.get("area", ""),
+                listing.get("image", ""),
+                listing.get("date_activated", ""),
+                now,
+            ))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def get_changes(current_listings):
@@ -102,13 +108,53 @@ def get_changes(current_listings):
     return new_listings, removed_listings, price_changes
 
 
+def save_changes(listings, removed_ids):
+    """Upsert listings and delete removed ones in a single transaction."""
+    conn = get_connection()
+    now = datetime.now().isoformat()
+    try:
+        conn.execute("BEGIN")
+        if removed_ids:
+            conn.executemany("DELETE FROM listings WHERE id = ?", [(lid,) for lid in removed_ids])
+        for listing in listings:
+            conn.execute("""
+                INSERT OR REPLACE INTO listings
+                    (id, source, url, title, price, price_eur, rooms, area, image, date_activated, scraped_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                listing["id"],
+                listing.get("source", ""),
+                listing["url"],
+                listing["title"],
+                listing["price"],
+                listing.get("price_eur", 0),
+                listing.get("rooms", ""),
+                listing.get("area", ""),
+                listing.get("image", ""),
+                listing.get("date_activated", ""),
+                now,
+            ))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def delete_listings(listing_ids):
     if not listing_ids:
         return
     conn = get_connection()
-    conn.executemany("DELETE FROM listings WHERE id = ?", [(lid,) for lid in listing_ids])
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("BEGIN")
+        conn.executemany("DELETE FROM listings WHERE id = ?", [(lid,) for lid in listing_ids])
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _normalize_price(price_str):

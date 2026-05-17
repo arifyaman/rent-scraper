@@ -127,12 +127,24 @@ async def main():
     database.init_db()
 
     print("\n[1/4] Scraping kv.ee listings...")
-    kv_listings = await scraper.scrape_all_pages()
-    print(f"  Found {len(kv_listings)} listings from kv.ee.")
+    kv_ok = True
+    try:
+        kv_listings = await scraper.scrape_all_pages()
+        print(f"  Found {len(kv_listings)} listings from kv.ee.")
+    except Exception as e:
+        kv_ok = False
+        kv_listings = []
+        print(f"  ERROR: kv.ee scraper failed: {e}")
 
     print("\n[2/4] Scraping city24 listings...")
-    city24_listings = await city24_scraper.scrape_all_pages()
-    print(f"  Found {len(city24_listings)} listings from city24.")
+    city24_ok = True
+    try:
+        city24_listings = await city24_scraper.scrape_all_pages()
+        print(f"  Found {len(city24_listings)} listings from city24.")
+    except Exception as e:
+        city24_ok = False
+        city24_listings = []
+        print(f"  ERROR: city24 scraper failed: {e}")
 
     all_listings = kv_listings + city24_listings
     print(f"\n[3/4] Total merged: {len(all_listings)} listings.")
@@ -143,10 +155,21 @@ async def main():
 
     has_changes = new or changed
 
-    if removed:
-        database.delete_listings([l["id"] for l in removed])
+    # Source-aware removal: only delete listings from sources that succeeded
+    if not kv_ok:
+        removed = [l for l in removed if l["source"] != "kv.ee"]
+        print("  WARNING: kv.ee scrape failed, not removing kv.ee listings from DB")
+    if not city24_ok:
+        removed = [l for l in removed if l["source"] != "city24"]
+        print("  WARNING: city24 scrape failed, not removing city24 listings from DB")
 
-    database.upsert_listings(all_listings)
+    # Save changes in a single transaction
+    removed_ids = [l["id"] for l in removed]
+    try:
+        database.save_changes(all_listings, removed_ids)
+    except Exception as e:
+        print(f"  ERROR: Database save failed: {e}")
+        return
 
     if has_changes:
         report = build_report(new, removed, changed)
