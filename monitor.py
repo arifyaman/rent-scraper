@@ -96,11 +96,6 @@ def build_report(new, removed, changed):
         for l in new:
             parts.append(_listing_card(l))
 
-    if removed:
-        parts.append(f"<h3>REMOVED ({len(removed)}):</h3>")
-        for l in removed:
-            parts.append(_listing_card(l))
-
     if changed:
         parts.append(f"<h3>PRICE CHANGES ({len(changed)}):</h3>")
         for c in changed:
@@ -115,7 +110,7 @@ def build_report(new, removed, changed):
     <a href="{c['url']}" style="color: #0066cc;">View listing</a>
 </div>""")
 
-    if not new and not removed and not changed:
+    if not new and not changed:
         parts.append("<p>No changes detected.</p>")
 
     parts.append("<hr><p><em>This is an automated alert from rental monitor.</em></p></body></html>")
@@ -146,7 +141,7 @@ async def main():
     new, removed, changed = database.get_changes(all_listings)
     print(f"  New: {len(new)}, Removed: {len(removed)}, Price changes: {len(changed)}")
 
-    has_changes = new or removed or changed
+    has_changes = new or changed
 
     if removed:
         database.delete_listings([l["id"] for l in removed])
@@ -157,7 +152,7 @@ async def main():
         report = build_report(new, removed, changed)
         subject = (
             f"{config.EMAIL_SUBJECT_PREFIX} "
-            f"{len(new)} new, {len(removed)} removed, {len(changed)} price changes"
+            f"{len(new)} new, {len(changed)} price changes"
         )
         print("\n" + report)
         print("\nSending email alert...")
