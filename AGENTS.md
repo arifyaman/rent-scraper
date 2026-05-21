@@ -81,8 +81,7 @@ Scrapes City24 using Playwright to fetch JSON API data (single call, no paginati
 - `_extract_slogan(item)` — extracts slogan from nested `slogans` dict (tries `en_GB` first, falls back to `et_EE`).
 - `_parse_date(date_str)` — splits ISO datetime string to date-only format.
 - `_process_image(item)` — extracts image URL and replaces `{fmt:em}` placeholder with `"13"`.
-- `_build_url(item, slug)` — constructs full listing URL from slug + friendly_id.
-- `_slugify(s)` — lowercase, strip special chars, replace spaces with hyphens.
+- `_build_url(item)` — constructs full listing URL as `https://www.city24.ee/real-estate/{friendly_id}`.
 
 **Data shape** (output listing dict): same schema as `scraper.py`, but `source` is `"city24"` and `price` uses `"€"` suffix format.
 

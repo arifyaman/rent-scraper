@@ -5,13 +5,6 @@ from playwright.async_api import async_playwright
 import config
 
 
-def _slugify(s):
-    s = s.lower().strip()
-    s = re.sub(r'[^\w\s-]', '', s)
-    s = re.sub(r'[\s]+', '-', s)
-    return s
-
-
 def _extract_slogan(item):
     slogans = item.get("slogans", {})
     if not isinstance(slogans, dict):
@@ -41,9 +34,9 @@ def _process_image(item):
     return image
 
 
-def _build_url(item, slug):
+def _build_url(item):
     friendly_id = item.get("friendly_id", str(item.get("id", "")))
-    return f"https://www.city24.ee/en/real-estate/apartments-for-rent/{slug}/{friendly_id}"
+    return f"https://www.city24.ee/real-estate/{friendly_id}"
 
 
 async def scrape_all_pages():
@@ -103,9 +96,7 @@ def _parse_listings(data):
         slogan = _extract_slogan(item)
         title = slogan or f"Apartment {rooms}r"
 
-        addr = item.get("address", {})
-        slug = _slugify(f"{addr.get('parish_name', '')} {addr.get('city_name', '')} {addr.get('street_name', '')}")
-        url = _build_url(item, slug)
+        url = _build_url(item)
 
         listings.append({
             "id": item_id,
