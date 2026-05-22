@@ -20,11 +20,11 @@ KV_SEARCH_PARAMS = {
     "parish": "1061",
     "city[0]": "1003",
     "cluster": "true",
-    "zoom": "16.09032008642905",
-    "nelat": "59.43296909968546",
-    "nelng": "24.770517743598795",
-    "swlat": "59.42466558149462",
-    "swlng": "24.74637145669501",
+    "zoom": "16.30999999999998",
+    "nelat": "59.432365751193565",
+    "nelng": "24.771527269944674",
+    "swlat": "59.42459233494361",
+    "swlng": "24.7507915021136",
     "orderby": "cdwl",
 }
 
@@ -38,8 +38,10 @@ CITY24_SEARCH_URL = (
     "&tsType=rent"
     "&unitType=Apartment"
     "&roomCount=2%2C3"
-    "&boundingBox[nw]=59.431207,24.751760"
-    "&boundingBox[se]=59.428029,24.765685"
+    "&boundingBox[nw]=59.431175,24.752333"
+    "&boundingBox[se]=59.426775,24.773918"
+    "&zoomLevel=12.565"
+    "&extent=942"
 )
 
 DB_PATH = "data/listings.db"
