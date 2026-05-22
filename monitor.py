@@ -84,7 +84,7 @@ def _listing_card(l):
 </div>"""
 
 
-def build_report(new, removed, changed):
+def build_report(new, removed, changed, booked_changes):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     parts = [f"""<html>
 <body style="font-family: Arial, sans-serif; font-size: 14px;">
@@ -110,11 +110,26 @@ def build_report(new, removed, changed):
     <a href="{c['url']}" style="color: #0066cc;">View listing</a>
 </div>""")
 
-    if not new and not changed:
-        parts.append("<p>No changes detected.</p>")
+    if booked_changes:
+        parts.append(f"<h3>BOOKED CHANGES ({len(booked_changes)}):</h3>")
+        for bc in booked_changes:
+            badge = _source_badge(bc)
+            if bc["is_now_booked"]:
+                status = f'<span style="background: #ff4444; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px;">BOOKED</span> (until {bc["booked_until"][:10]})'
+            else:
+                status = '<span style="background: #44cc44; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 3px;">UNBOOKED</span>'
+            image_html = ""
+            if bc.get("image"):
+                image_html = f'<img src="{bc["image"]}" width="300" height="200" style="object-fit: cover; border-radius: 4px;"><br>'
+            parts.append(f"""<div style="border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin: 8px 0; display: inline-block; width: 280px; vertical-align: top;">
+    {image_html}
+    <strong>#{bc['id']}</strong> {badge} - {bc['title']}<br>
+    {status}<br>
+    <a href="{bc['url']}" style="color: #0066cc;">View listing</a>
+</div>""")
 
-    parts.append("<hr><p><em>This is an automated alert from rental monitor.</em></p></body></html>")
-    return "\n".join(parts)
+    if not new and not changed and not booked_changes:
+        parts.append("<p>No changes detected.</p>")
 
 
 async def main():
@@ -150,10 +165,10 @@ async def main():
     print(f"\n[3/4] Total merged: {len(all_listings)} listings.")
 
     print("\n[4/4] Checking for changes...")
-    new, removed, changed = database.get_changes(all_listings)
-    print(f"  New: {len(new)}, Removed: {len(removed)}, Price changes: {len(changed)}")
+    new, removed, changed, booked_changes = database.get_changes(all_listings)
+    print(f"  New: {len(new)}, Removed: {len(removed)}, Price changes: {len(changed)}, Booked changes: {len(booked_changes)}")
 
-    has_changes = new or changed
+    has_changes = new or changed or booked_changes
 
     # Source-aware removal: only delete listings from sources that succeeded
     if not kv_ok:
@@ -172,7 +187,7 @@ async def main():
         return
 
     if has_changes:
-        report = build_report(new, removed, changed)
+        report = build_report(new, removed, changed, booked_changes)
         subject = (
             f"{config.EMAIL_SUBJECT_PREFIX} "
             f"{len(new)} new, {len(changed)} price changes"

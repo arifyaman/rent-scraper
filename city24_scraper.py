@@ -96,6 +96,11 @@ def _parse_listings(data):
         slogan = _extract_slogan(item)
         title = slogan or f"Apartment {rooms}r"
 
+        booked = item.get("booked")
+        booked_until = ""
+        if isinstance(booked, dict):
+            booked_until = booked.get("booked_until", "")
+
         url = _build_url(item)
 
         listings.append({
@@ -109,6 +114,7 @@ def _parse_listings(data):
             "area": area,
             "image": image,
             "date_activated": date_activated,
+            "booked_until": booked_until,
         })
 
     return listings

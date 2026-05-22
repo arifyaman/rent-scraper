@@ -25,6 +25,7 @@ def init_db():
             area TEXT,
             image TEXT,
             date_activated TEXT,
+            booked_until TEXT,
             scraped_at TEXT
         )
     """)
@@ -46,19 +47,20 @@ def upsert_listings(listings):
         for listing in listings:
             conn.execute("""
                 INSERT OR REPLACE INTO listings
-                    (id, source, url, title, price, price_eur, rooms, area, image, date_activated, scraped_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, source, url, title, price, price_eur, rooms, area, image, date_activated, booked_until, scraped_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 listing["id"],
                 listing.get("source", ""),
                 listing["url"],
                 listing["title"],
-                listing["price"],
+                listing.get("price", ""),
                 listing.get("price_eur", 0),
                 listing.get("rooms", ""),
                 listing.get("area", ""),
                 listing.get("image", ""),
                 listing.get("date_activated", ""),
+                listing.get("booked_until", ""),
                 now,
             ))
         conn.commit()
@@ -89,6 +91,13 @@ def get_changes(current_listings):
         if old_price and new_price and old_price != new_price:
             changed_ids.add(lid)
 
+    booked_changed_ids = set()
+    for lid in current_ids & db_ids:
+        old_booked = db_map[lid].get("booked_until", "") or ""
+        new_booked = current_map[lid].get("booked_until", "") or ""
+        if old_booked != new_booked and (old_booked or new_booked):
+            booked_changed_ids.add(lid)
+
     conn.close()
 
     new_listings = [current_map[lid] for lid in sorted(new_ids)]
@@ -105,7 +114,21 @@ def get_changes(current_listings):
             "image": current_map[lid].get("image", ""),
         })
 
-    return new_listings, removed_listings, price_changes
+    booked_changes = []
+    for lid in sorted(booked_changed_ids):
+        is_now_booked = bool(current_map[lid].get("booked_until", ""))
+        booked_changes.append({
+            "id": lid,
+            "source": current_map[lid].get("source", ""),
+            "title": current_map[lid]["title"],
+            "booked_until": current_map[lid].get("booked_until", ""),
+            "was_booked": bool(db_map[lid].get("booked_until", "")),
+            "is_now_booked": is_now_booked,
+            "url": current_map[lid]["url"],
+            "image": current_map[lid].get("image", ""),
+        })
+
+    return new_listings, removed_listings, price_changes, booked_changes
 
 
 def save_changes(listings, removed_ids):
@@ -119,19 +142,20 @@ def save_changes(listings, removed_ids):
         for listing in listings:
             conn.execute("""
                 INSERT OR REPLACE INTO listings
-                    (id, source, url, title, price, price_eur, rooms, area, image, date_activated, scraped_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, source, url, title, price, price_eur, rooms, area, image, date_activated, booked_until, scraped_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 listing["id"],
                 listing.get("source", ""),
                 listing["url"],
                 listing["title"],
-                listing["price"],
+                listing.get("price", ""),
                 listing.get("price_eur", 0),
                 listing.get("rooms", ""),
                 listing.get("area", ""),
                 listing.get("image", ""),
                 listing.get("date_activated", ""),
+                listing.get("booked_until", ""),
                 now,
             ))
         conn.commit()
