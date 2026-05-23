@@ -71,9 +71,12 @@ def upsert_listings(listings):
         conn.close()
 
 
-def get_changes(current_listings):
+def get_changes(current_listings, force_all_new=False):
     current_ids = {l["id"] for l in current_listings}
     current_map = {l["id"]: l for l in current_listings}
+
+    if force_all_new:
+        return current_listings, [], [], []
 
     conn = get_connection()
 

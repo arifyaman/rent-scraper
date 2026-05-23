@@ -84,7 +84,7 @@ def _listing_card(l):
 </div>"""
 
 
-def build_report(new, removed, changed, booked_changes):
+def build_report(new, removed, changed, booked_changes, send_all=False):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     parts = [f"""<html>
 <body style="font-family: Arial, sans-serif; font-size: 14px;">
@@ -129,17 +129,23 @@ def build_report(new, removed, changed, booked_changes):
 </div>""")
 
     if not new and not changed and not booked_changes:
-        parts.append("<p>No changes detected.</p>")
+        if send_all:
+            parts.append(f"<p>Total listings: {len(new + removed + changed)}</p>")
+        else:
+            parts.append("<p>No changes detected.</p>")
 
     parts.append("<hr><p><em>This is an automated alert from rental monitor.</em></p></body></html>")
     return "\n".join(parts)
 
 
-async def main():
+async def main(send_all=False):
     email_cfg = load_email_config()
 
     print("=" * 60)
-    print("Rental Monitor (kv.ee + city24)")
+    if send_all:
+        print("Rental Monitor -- SEND ALL (all listings treated as new)")
+    else:
+        print("Rental Monitor (kv.ee + city24)")
     print("=" * 60)
 
     database.init_db()
@@ -168,10 +174,14 @@ async def main():
     print(f"\n[3/4] Total merged: {len(all_listings)} listings.")
 
     print("\n[4/4] Checking for changes...")
-    new, removed, changed, booked_changes = database.get_changes(all_listings)
+    new, removed, changed, booked_changes = database.get_changes(all_listings, force_all_new=send_all)
     print(f"  New: {len(new)}, Removed: {len(removed)}, Price changes: {len(changed)}, Booked changes: {len(booked_changes)}")
 
-    has_changes = new or changed or booked_changes
+    has_changes = new or changed or booked_changes or send_all
+
+    if send_all:
+        removed = []
+        print("  Mode: send_all - all listings will be included in email")
 
     # Source-aware removal: only delete listings from sources that succeeded
     if not kv_ok:
@@ -190,11 +200,14 @@ async def main():
         return
 
     if has_changes:
-        report = build_report(new, removed, changed, booked_changes)
-        subject = (
-            f"{config.EMAIL_SUBJECT_PREFIX} "
-            f"{len(new)} new, {len(changed)} price changes"
-        )
+        report = build_report(new, removed, changed, booked_changes, send_all=send_all)
+        if send_all:
+            subject = f"{config.EMAIL_SUBJECT_PREFIX} All listings ({len(all_listings)})"
+        else:
+            subject = (
+                f"{config.EMAIL_SUBJECT_PREFIX} "
+                f"{len(new)} new, {len(changed)} price changes"
+            )
         print("\n" + report)
         print("\nSending email alert...")
         send_email(email_cfg, subject, report)
@@ -205,4 +218,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    send_all = "--send-all" in sys.argv
+    asyncio.run(main(send_all))
