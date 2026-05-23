@@ -131,6 +131,9 @@ def build_report(new, removed, changed, booked_changes):
     if not new and not changed and not booked_changes:
         parts.append("<p>No changes detected.</p>")
 
+    parts.append("<hr><p><em>This is an automated alert from rental monitor.</em></p></body></html>")
+    return "\n".join(parts)
+
 
 async def main():
     email_cfg = load_email_config()
