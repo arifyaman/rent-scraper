@@ -91,13 +91,13 @@ Scrapes City24 using Playwright to fetch JSON API data (single call, no paginati
 
 SQLite storage layer with change detection logic.
 
-**Schema:** Single `listings` table with columns: `id` (PK), `source`, `url`, `title`, `price`, `price_eur`, `rooms`, `area`, `image`, `date_activated`, `scraped_at`.
+**Schema:** Single `listings` table with columns: `id` (PK), `source`, `url`, `title`, `price`, `price_eur`, `rooms`, `area`, `image`, `date_activated`, `booked_until`, `scraped_at`.
 
 **Key functions:**
 - `get_connection()` — opens SQLite connection with `row_factory = sqlite3.Row`. Creates parent dir if needed.
 - `init_db()` — creates `listings` table if missing. Migrates `source` column if needed (backward compat for old DBs).
 - `upsert_listings(listings)` — INSERT OR REPLACE for each listing. Records current ISO timestamp as `scraped_at`.
-- `get_changes(current_listings)` — compares current scrape results against DB. Returns tuple of `(new_listings, removed_listings, price_changes)`. Price comparison uses `_normalize_price()` to extract numeric values.
+- `get_changes(current_listings, force_all_new=False)` — compares current scrape results against DB. When `force_all_new=True`, skips DB comparison and returns all listings as "new". Returns tuple of `(new_listings, removed_listings, price_changes, booked_changes)`. Price comparison uses `_normalize_price()` to extract numeric values.
 - `delete_listings(listing_ids)` — bulk DELETE by ID for removed listings.
 - `_normalize_price(price_str)` — regex extracts numeric portion from formatted price string (handles `&nbsp;`, commas).
 
@@ -113,17 +113,18 @@ Main orchestrator. Runs both scrapers, merges results, detects changes, and send
 3. `await scraper.scrape_all_pages()` — fetches KV.ee listings
 4. `await city24_scraper.scrape_all_pages()` — fetches City24 listings
 5. Merges both lists
-6. `database.get_changes(all_listings)` — detects new, removed, price-changed listings
-7. If changes exist: builds HTML report, sends email, upserts all listings, deletes removed ones
-8. If no changes: just upserts, no email sent
+6. `database.get_changes(all_listings, force_all_new=send_all)` — detects new, removed, price-changed, and booked-changed listings
+7. If changes exist or `send_all=True`: builds HTML report, sends email, upserts all listings, deletes removed ones
+8. If no changes and not `send_all`: just upserts, no email sent
 
 **Key functions:**
 - `load_email_config()` — reads SMTP settings from env vars. Supports `EMAIL_DISABLED` flag for dev mode.
 - `send_email(cfg, subject, body)` — sends HTML email via SMTP. Skips if disabled or config incomplete.
 - `_source_badge(l)` — returns colored HTML badge for source (blue for city24, orange for kv.ee).
 - `_listing_card(l)` — builds HTML card with image, title, price, area, date, and link.
-- `build_report(new, removed, changed)` — assembles full HTML email with sections for new, removed, and price-changed listings.
-- `main()` — async entrypoint. Full orchestration flow.
+- `build_report(new, removed, changed, booked_changes, send_all=False)` — assembles full HTML email with sections for new, removed, price-changed, and booked-changed listings.
+- `main(send_all=False)` — async entrypoint. When `send_all=True`, treats all scraped listings as new (ignores DB comparison) and always sends email.
+- `__main__` block — parses `--send-all` CLI flag for one-off full listing emails.
 
 ---
 
@@ -183,8 +184,11 @@ Both scrapers produce dicts with identical shape:
     "area": str,          # area with unit (e.g. "45 m²")
     "image": str,         # thumbnail image URL
     "date_activated": str, # YYYY-MM-DD
+    "booked_until": str,  # ISO date-time if booked, else empty string
 }
 ```
+
+Note: `booked_until` is only populated for City24 listings (KV.ee does not provide booking info).
 
 ---
 
@@ -193,6 +197,12 @@ Both scrapers produce dicts with identical shape:
 ```bash
 # One-time run (dev)
 APP_ENV=development python3 monitor.py
+
+# One-time run: email ALL listings (full report, no DB comparison)
+python3 monitor.py --send-all
+
+# Dev mode preview (email disabled, shows report in terminal)
+APP_ENV=development python3 monitor.py --send-all
 
 # Background service (prod)
 python3 service.py
